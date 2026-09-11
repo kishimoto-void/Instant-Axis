@@ -38,6 +38,7 @@ class Capsule:
         self._net: Optional[dict] = None
         self.last: dict = {}
         self.char: dict = {}
+        self.env: dict = {}
 
     def here(self, time: str = "", project: str = "", topic: str = "") -> "Capsule":
         self.g = Gamma(
@@ -117,6 +118,63 @@ class Capsule:
         out["reason"] = "net_and_pin" if out["ok"] else pin.get("reason")
         out["standing"] = "origin"
         self.char = out
+        return out
+
+    def keep(self, field: str, value: str, *, episode: str = "記憶", person: str = "") -> dict:
+        """γindex で記憶強化。cited。IS ではない。無いピンは先に打つ。"""
+        if not self.b.axis1._gamma_inv:
+            self.pin(self.g.topic or "char-scope")
+        who = person or (self.char.get("name") if self.char else "") or "基準体"
+        row = self.note(field, value, person=str(who), episode=episode)
+        row["boost"] = "gamma"
+        return row
+
+    def memory(self, cue: str, net: NetIn = True) -> dict:
+        """強化した γindex を読む。接続が要る。"""
+        return self.recall(cue, net=net)
+
+    def around(self, url: str = "", place: str = "") -> dict:
+        """キャラ取得のあと、周りを穴で開く。関係度は後で。発明しない。"""
+        out = {
+            "ok": False,
+            "place": place or "?",
+            "others": [],
+            "props": [],
+            "holes": ["place", "others", "props", "relation"],
+            "relation": {"later": True, "degree": None},
+            "standing": "origin",
+            "pattern": "ledger",
+            "level": "L4_ledger",
+            "equation": FRAME_EQ,
+            "invented": False,
+            "completed": False,
+            "instruct": "周りはページに書いてある欄だけ。関係度は後で追記。今は穴。",
+            "gamma": self.g.label(),
+            "net": None,
+            "pin": None,
+        }
+        if not (self.char or {}).get("ok"):
+            out["reason"] = "character_required"
+            self.env = out
+            return out
+        if url:
+            net = self.net(url)
+            out["net"] = net
+            if not net.get("connected"):
+                out["reason"] = net.get("reason") or "net_required"
+                self.env = out
+                return out
+        elif self._net:
+            out["net"] = dict(self._net)
+        else:
+            out["reason"] = "net_required"
+            self.env = out
+            return out
+        pin = self.pin("around-" + str(self.char.get("name") or "char"))
+        out["pin"] = pin
+        out["ok"] = bool(pin.get("ok"))
+        out["reason"] = "around_open" if out["ok"] else pin.get("reason")
+        self.env = out
         return out
 
     def note(
@@ -363,6 +421,26 @@ class TestGeneralCapsule(unittest.TestCase):
         self.assertEqual(self.c.b.axis1.is_lines(self.c.g), [])
         self.assertEqual(self.c.b.axis0.hash_a0, forge_axes().axis0.hash_a0)
 
+    def test_08_keep_gamma_and_around_after_character(self):
+        early = self.c.around()
+        self.assertEqual(early["reason"], "character_required")
+        self.assertTrue(early["relation"]["later"])
+        self.c.character("https://example.com", "hero", topic="hero")
+        env = self.c.around()
+        self.assertTrue(env["ok"])
+        self.assertEqual(env["place"], "?")
+        self.assertIsNone(env["relation"]["degree"])
+        self.assertIn("relation", env["holes"])
+        row = self.c.keep("結論", "隔離")
+        self.assertTrue(row["ok"])
+        self.assertEqual(row["boost"], "gamma")
+        self.assertEqual(row["standing"], "supported")
+        mem = self.c.memory("隔離")
+        self.assertTrue(mem["ok"])
+        self.assertEqual(mem["standing"], "supported")
+        self.assertEqual(self.c.b.axis1.is_lines(self.c.g), [])
+        self.assertEqual(self.c.b.axis0.hash_a0, forge_axes().axis0.hash_a0)
+
 
 if __name__ == "__main__":
     import sys
@@ -378,10 +456,15 @@ if __name__ == "__main__":
         print("FROM_NET", json.dumps({k: hit[k] for k in ("ok", "reason", "standing", "gamma", "holes", "equation", "invented") if k in hit}, ensure_ascii=False))
         print("PIN", hit.get("pin"))
         print("NET", {k: hit["net"].get(k) for k in ("connected", "url", "status")})
+        env = c.around()
+        print("AROUND", json.dumps({k: env[k] for k in ("ok", "reason", "place", "holes", "relation", "equation") if k in env}, ensure_ascii=False))
+        print("KEEP", c.keep("結論", "隔離"))
+        print("MEMORY", {k: c.memory("隔離").get(k) for k in ("ok", "standing", "reason")})
         print("PASTE")
         print("GROK.md を机にせよ。level を申告せよ。1+?=0。")
         print("キャラ設定は渡したURLからだけ取れ。ページに無い欄は穴。")
         print("過去はネット接続とγindex。無いなら覚えていない。発明するな。")
+        print("キャラのあと周りは穴で開け。関係度は後で。今は付けるな。")
         print("A0", c.b.axis0.hash_a0[:16], "completed", c.b.axis3.frame.completed())
     else:
         unittest.main(verbosity=2)

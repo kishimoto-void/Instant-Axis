@@ -55,7 +55,15 @@ pin: char-<名前>
 
 ---
 
-## 3 過去を思い出す
+## 2b 周りを開く
+
+キャラ取得のあと。場所・他者・小道具は穴で開く。書いてある欄だけ写す。
+
+関係度は **後で追記**。今は `relation.later=True`。数字を付けるな。
+
+---
+
+## 3 過去を思い出す / γindex で強化
 
 両方要る。
 
@@ -102,9 +110,10 @@ stored を根拠にするな。核（基準体）を直すな。丁寧語化す�
 ```python
 from axis_general import Capsule
 c = Capsule(topic="hero")
-print(c.character("https://example.com", "hero"))
-# net + pin。設定本文はページに無いので穴。
-# ページを読んだ人間／Grok が visible だけ note する。
+c.character("https://example.com", "hero")
+c.keep("結論", "隔離")   # γindex 強化
+c.around()               # 周りは穴。関係度は後で
+c.memory("隔離")
 ```
 
 一般タイプは接続とピンまで。本文の解釈はチャットの Grok。核へは書かない。
